@@ -15,8 +15,7 @@ export const ConfirmDeleteModal = ({
       <View style={styles.container}>
         <Text style={styles.title}>Hủy thay đổi</Text>
         <Text style={styles.message}>
-          Bạn có các thay đổi chưa được lưu. Bạn có chắc muốn đóng bảng này
-          không? Mọi thay đổi sẽ bị mất.
+          Bạn có chắc muốn xóa giáo viên này không. Mọi thay đổi không thể quay lại.
         </Text>
 
         <View style={styles.line} />
