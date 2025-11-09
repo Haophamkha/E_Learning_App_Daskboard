@@ -18,7 +18,6 @@ import { addCourseAsync, fetchCoursesAsync } from "../auth/dataSlice";
 import { Course, Chapter, Lesson, Teacher, CATEGORIES } from "../types/type";
 import { StyleSheet } from "react-native";
 
-
 const STATUS_OPTIONS: Array<"completed" | "inprogress" | "not_started"> = [
   "not_started",
   "inprogress",
@@ -52,6 +51,7 @@ const CourseCreateScreen = () => {
     likes: 0,
     share: 0,
   });
+
   const [chapters, setChapters] = useState<Chapter[]>([
     {
       title: "Chương 1",
@@ -66,6 +66,7 @@ const CourseCreateScreen = () => {
       ],
     },
   ]);
+
   const [statusModal, setStatusModal] = useState<{
     visible: boolean;
     chapterIndex: number;
@@ -114,10 +115,11 @@ const CourseCreateScreen = () => {
     );
   }, [course, chapters, currentTeacher]);
 
+  // ĐÃ SỬA HOÀN CHỈNH: TẠO PAYLOAD SẠCH, XÓA id HOÀN TOÀN
   const handleCreate = async () => {
     if (!currentTeacher?.id) {
       Alert.alert("Lỗi", "Vui lòng đăng nhập để tạo khóa học!");
-      navigation.navigate("Login"); 
+      navigation.navigate("Login");
       return;
     }
 
@@ -126,7 +128,8 @@ const CourseCreateScreen = () => {
       return;
     }
 
-    const payload: Omit<Course, "id"> = {
+    // TẠO DỮ LIỆU SẠCH – KHÔNG DÙNG course TRỰC TIẾP
+    const cleanData: Omit<Course, "id" | "created_at"> = {
       name: course.name || "",
       price: course.price || 0,
       discount: course.discount || 0,
@@ -148,32 +151,31 @@ const CourseCreateScreen = () => {
       },
       qa: [],
       reviews: [],
-      teacherid: currentTeacher.id, 
+      teacherid: currentTeacher.id,
       vote: 0,
       votecount: 0,
       likes: 0,
       share: 0,
     };
 
-    console.log("Payload sent to Supabase:", JSON.stringify(payload, null, 2));
+    // XÓA id HOÀN TOÀN (phòng trường hợp bị nhiễm)
+    delete (cleanData as any).id;
+    delete (cleanData as any).created_at;
+
+    console.log(
+      "Payload sent to Supabase (NO ID):",
+      JSON.stringify(cleanData, null, 2)
+    );
 
     try {
-      const result = await dispatch(addCourseAsync(payload)).unwrap();
+      const result = await dispatch(addCourseAsync(cleanData)).unwrap();
       console.log("Course created:", result);
       await dispatch(fetchCoursesAsync()).unwrap();
       Alert.alert("Thành công", "Tạo khóa học thành công!");
       navigation.goBack();
     } catch (err: any) {
       console.error("Supabase error:", JSON.stringify(err, null, 2));
-      Alert.alert(
-        "Lỗi",
-        err.message === "User not authenticated"
-          ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
-          : err.message || "Tạo khóa học thất bại"
-      );
-      if (err.message === "User not authenticated") {
-        navigation.navigate("Login"); 
-      }
+      Alert.alert("Lỗi", err.message || "Tạo khóa học thất bại");
     }
   };
 
@@ -560,6 +562,7 @@ const CourseCreateScreen = () => {
 
 export default CourseCreateScreen;
 
+// Styles giữ nguyên
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9fafb" },
   backButton: {
@@ -646,7 +649,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: "#eecz5e7eb",
   },
   chapterHeader: {
     flexDirection: "row",

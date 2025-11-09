@@ -161,25 +161,37 @@ export const addCourseAsync = createAsyncThunk(
       const currentTeacher = state.auth.currentUser as Teacher | null;
 
       if (!currentTeacher?.id) {
-        console.error("No teacher found in state:", state.auth.currentUser);
         return rejectWithValue("Thông tin giáo viên không tồn tại");
       }
 
+      // TẠO PAYLOAD SẠCH – KHÔNG DÙNG course TRỰC TIẾP
       const payload = {
-        ...course,
-        teacherid: currentTeacher.id,
+        name: course.name,
+        price: course.price,
+        discount: course.discount,
+        category: course.category,
+        description: course.description,
+        image: course.image,
+        lessoncount: course.lessoncount,
+        duration: course.duration,
         chapters: JSON.stringify(course.chapters || []),
         project: JSON.stringify(
           course.project || { description: "", studentproject: [] }
         ),
         qa: JSON.stringify(course.qa || []),
         reviews: JSON.stringify(course.reviews || []),
+        teacherid: currentTeacher.id,
+        vote: course.vote ?? 0,
+        votecount: course.votecount ?? 0,
+        likes: course.likes ?? 0,
+        share: course.share ?? 0,
       };
 
-      console.log(
-        "Adding course to Supabase:",
-        JSON.stringify(payload, null, 2)
-      );
+      // XÓA id HOÀN TOÀN (phòng thủ)
+      delete (payload as any).id;
+      delete (payload as any).created_at;
+
+      console.log("FINAL PAYLOAD (NO ID):", JSON.stringify(payload, null, 2));
 
       const { data, error } = await supabase
         .from("courses")
