@@ -24,7 +24,7 @@ export const login = createAsyncThunk<
   { rejectValue: string }
 >("auth/login", async ({ username, password }, { rejectWithValue }) => {
   try {
-    // Kiểm tra admin
+
     const { data: adminData, error: adminErr } = await supabase
       .from("admins")
       .select("*")
@@ -54,6 +54,13 @@ export const login = createAsyncThunk<
     }
 
     if (teacherData) {
+      if (
+        teacherData.status &&
+        teacherData.status.toLowerCase() === "inactive"
+      ) {
+        return rejectWithValue("Tài khoản của bạn hiện đang bị khóa");
+      }
+
       return { user: teacherData as Teacher, type: "teacher" };
     }
 
@@ -63,6 +70,7 @@ export const login = createAsyncThunk<
     return rejectWithValue(err.message || "Đăng nhập thất bại");
   }
 });
+
 
 export const logout = createAsyncThunk<boolean, void, { rejectValue: string }>(
   "auth/logout",

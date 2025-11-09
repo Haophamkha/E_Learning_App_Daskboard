@@ -1,11 +1,11 @@
 export interface Admin {
-  id: string; // ví dụ "001A", "002A"
+  id: string; 
   name: string;
   image: string;
-  adminname: string; // username cho admin
+  adminname: string; 
   password: string;
-  contact: string; // thay cho email
-  status?: "active" | "inactive"; // trạng thái admin, tùy chọn
+  contact: string; 
+  status?: "active" | "inactive"; 
 }
 
 export type Database = {
