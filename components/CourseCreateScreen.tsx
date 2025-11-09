@@ -115,7 +115,6 @@ const CourseCreateScreen = () => {
     );
   }, [course, chapters, currentTeacher]);
 
-  // ĐÃ SỬA HOÀN CHỈNH: TẠO PAYLOAD SẠCH, XÓA id HOÀN TOÀN
   const handleCreate = async () => {
     if (!currentTeacher?.id) {
       Alert.alert("Lỗi", "Vui lòng đăng nhập để tạo khóa học!");
@@ -128,7 +127,6 @@ const CourseCreateScreen = () => {
       return;
     }
 
-    // TẠO DỮ LIỆU SẠCH – KHÔNG DÙNG course TRỰC TIẾP
     const cleanData: Omit<Course, "id" | "created_at"> = {
       name: course.name || "",
       price: course.price || 0,
