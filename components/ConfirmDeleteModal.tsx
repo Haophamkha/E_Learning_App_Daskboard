@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   container: {
-    width: "40%", // nhỏ gọn hơn
+    width: "40%", 
     backgroundColor: "#fff",
     borderRadius: 10,
     paddingTop: 20,

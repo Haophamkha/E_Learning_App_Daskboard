@@ -25,13 +25,8 @@ import { logout } from "../auth/authSlice";
 import { TeacherRow } from "../components/TeacherRow";
 import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import { useNavigation, CommonActions } from "@react-navigation/native";
-import {
-  FaArrowLeft,
-  FaArrowRight,
-  FaFilter,
-  FaSearch,
-  FaPlus,
-} from "react-icons/fa";
+import { FontAwesome } from "@expo/vector-icons";
+
 
 const AdminScreen = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -266,7 +261,12 @@ const AdminScreen = () => {
             style={styles.filterButton}
             onPress={() => setShowAddModal(true)}
           >
-            <FaPlus size={12} color="#4b5563" style={{ marginRight: 6 }} />
+            <FontAwesome
+              name="plus"
+              size={12}
+              color="#4b5563"
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.filterText}>Thêm Teacher</Text>
           </TouchableOpacity>
 
@@ -298,7 +298,12 @@ const AdminScreen = () => {
                 setShowStatusDropdown(false);
               }}
             >
-              <FaFilter size={12} color="#4b5563" style={{ marginRight: 6 }} />
+              <FontAwesome
+                name="filter"
+                size={12}
+                color="#4b5563"
+                style={{ marginRight: 6 }}
+              />
               <Text style={styles.filterText}>
                 {filterField ? `Filter: ${filterField}` : "Filter"}
               </Text>
@@ -306,7 +311,12 @@ const AdminScreen = () => {
           </View>
 
           <View style={styles.searchContainer}>
-            <FaSearch size={12} color="#9ca3af" style={{ marginRight: 6 }} />
+            <FontAwesome
+              name="search"
+              size={12}
+              color="#9ca3af"
+              style={{ marginRight: 6 }}
+            />
             <TextInput
               placeholder="Search..."
               value={searchText}
@@ -395,10 +405,11 @@ const AdminScreen = () => {
                     </Text>
                   ))}
                 </View>
-                {pageData.map((item) => (
+                {pageData.map((item, index) => (
                   <TeacherRow
                     key={item.id}
                     item={item}
+                    stt={(currentPage - 1) * pageSize + index + 1} // Tính STT đúng theo trang
                     isEditing={editingId === item.id}
                     editForm={editForm}
                     onEditField={updateEditField}
@@ -422,7 +433,8 @@ const AdminScreen = () => {
                   currentPage === 1 && styles.disabledButton,
                 ]}
               >
-                <FaArrowLeft
+                <FontAwesome
+                  name="arrow-left"
                   size={12}
                   color={currentPage === 1 ? "#9ca3af" : "#374151"}
                 />
@@ -498,7 +510,8 @@ const AdminScreen = () => {
                 >
                   Next
                 </Text>
-                <FaArrowRight
+                <FontAwesome
+                  name="arrow-right"
                   size={12}
                   color={currentPage === totalPages ? "#9ca3af" : "#374151"}
                 />

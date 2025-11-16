@@ -1,9 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
-import { FaRegStar } from "react-icons/fa";
-import { useDispatch, useSelector } from "react-redux";
-import { Teacher, Course, User } from "../types/type";
-import { RootState } from "../auth/store";
+import { Ionicons } from "@expo/vector-icons"; 
+import { Teacher, Course } from "../types/type";
 
 interface InspiresCourseProps {
   course: Course;
@@ -16,10 +14,8 @@ export const InspiresCourse = ({
   course,
   teachers = [],
   onPress,
+  onEdit,
 }: InspiresCourseProps) => {
-  const dispatch = useDispatch();
-  const currentUser = useSelector((state: RootState) => state.auth.currentUser);
-
   const teacher = teachers.find(
     (t) => String(t.id) === String(course.teacherid)
   );
@@ -35,20 +31,28 @@ export const InspiresCourse = ({
             {course.name}
           </Text>
 
-          
+          {/* Nút edit nếu cần */}
+          {onEdit && (
+            <TouchableOpacity onPress={onEdit}>
+              <Ionicons name="create-outline" size={20} color="#4B5563" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={styles.teacher}>{teacherName}</Text>
+
         <Text style={styles.price}>
           {course.price.toLocaleString("vi-VN")}₫
         </Text>
 
         <View style={styles.row}>
-          <FaRegStar color="#FFD700" />
+          <Ionicons name="star" size={14} color="#FFD700" />
           <Text style={styles.vote}>
             {course.vote} ({course.votecount})
           </Text>
+
           <Text style={styles.dot}>•</Text>
+
           <Text style={styles.lesson}>{course.lessoncount} bài học</Text>
         </View>
       </View>
@@ -120,9 +124,5 @@ const styles = StyleSheet.create({
   lesson: {
     fontSize: 12,
     color: "#555",
-  },
-  bookmark: {
-    position: "relative",
-    top: 20,
   },
 });

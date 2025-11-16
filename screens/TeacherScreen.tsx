@@ -6,12 +6,12 @@ import {
   TextInput,
   TouchableOpacity,
   Modal,
-  Alert,
   ScrollView,
   Image,
   ActivityIndicator,
   Pressable,
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
 import { CATEGORIES } from "../types/type";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../auth/store";
@@ -29,15 +29,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { InspiresCourse } from "../components/InspiresCourse";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { TeacherStackParamList } from "../components/TeacherStack";
-
+import { Alert, Platform, ToastAndroid } from "react-native";
 type NavigationProp = NativeStackNavigationProp<
   TeacherStackParamList,
   "TeacherHome"
 >;
 const Tab = createBottomTabNavigator();
 
-
-
+const showNotification = (title: string, message: string) => {
+  if (Platform.OS === "android") {
+    ToastAndroid.show(message, ToastAndroid.SHORT);
+  } else {
+    Alert.alert(title, message);
+  }
+};
 const CourseModal = ({
   course,
   visible,
@@ -55,6 +60,7 @@ const CourseModal = ({
   );
 
   const isEdit = !!course;
+  const [uploading, setUploading] = useState(false);
 
   const [form, setForm] = useState<Partial<Course>>(
     course
@@ -71,7 +77,6 @@ const CourseModal = ({
             description: course.project?.description ?? "",
             studentproject: course.project?.studentproject ?? [],
           },
-
           teacherid: course.teacherid,
           vote: course.vote,
           votecount: course.votecount,
@@ -90,10 +95,7 @@ const CourseModal = ({
           description: "",
           image: "https://placehold.co/300x200/cccccc/999999/png",
           lessoncount: 0,
-          project: {
-            description: "",
-            studentproject: [],
-          },
+          project: { description: "", studentproject: [] },
           teacherid: currentTeacher?.id || 0,
           vote: 0,
           votecount: 0,
@@ -105,16 +107,32 @@ const CourseModal = ({
         }
   );
 
+  const pickImage = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "image/*",
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled) {
+        setUploading(true);
+        setForm((p) => ({ ...p, image: result.assets[0].uri }));
+        setTimeout(() => setUploading(false), 500);
+      }
+    } catch (err) {
+      Alert.alert("Lỗi", "Không thể chọn ảnh");
+    }
+  };
+
   const hasChanges = () => {
     if (!isEdit) return !!form.name && (form.price ?? 0) > 0;
     return (
-      form.name !== course.name ||
-      form.price !== course.price ||
-      (form.discount ?? 0) !== (course.discount ?? 0) ||
-      form.category !== course.category ||
-      form.duration !== (course.duration ?? "") ||
-      form.description !== (course.description ?? "") ||
-      form.project?.description !== (course.project?.description ?? "")
+      form.name !== course?.name ||
+      form.price !== course?.price ||
+      (form.discount ?? 0) !== (course?.discount ?? 0) ||
+      form.category !== course?.category ||
+      form.duration !== (course?.duration ?? "") ||
+      form.description !== (course?.description ?? "") ||
+      form.project?.description !== (course?.project?.description ?? "")
     );
   };
 
@@ -151,7 +169,7 @@ const CourseModal = ({
         : await dispatch(addCourseAsync(courseData)).unwrap();
 
       onSave(result);
-      Alert.alert(
+      showNotification(
         "Thành công",
         isEdit ? "Cập nhật thành công!" : "Tạo khóa học thành công!"
       );
@@ -170,6 +188,33 @@ const CourseModal = ({
           </Text>
 
           <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Ảnh + Tên + Giá */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Ảnh khóa học</Text>
+              <Image
+                source={{ uri: form.image }}
+                style={styles.modalImagePreview}
+                resizeMode="cover"
+              />
+              <TouchableOpacity
+                style={[
+                  styles.uploadButton,
+                  uploading && styles.disabledButton,
+                ]}
+                onPress={pickImage}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="camera-outline" size={18} color="#fff" />
+                    <Text style={styles.uploadButtonText}>Chọn ảnh</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.row}>
               <View style={styles.halfInput}>
                 <Text style={styles.inputLabel}>Tên khóa học</Text>
@@ -295,7 +340,7 @@ const CourseModal = ({
   );
 };
 
-// Course
+// === CoursesTab ===
 const CoursesTab = () => {
   const dispatch = useDispatch<AppDispatch>();
   const currentTeacher = useSelector(
@@ -319,26 +364,12 @@ const CoursesTab = () => {
     : [];
 
   const handleCoursePress = (course: Course) => {
-    if (!currentTeacher) {
-      Alert.alert("Lỗi", "Không tìm thấy giáo viên!");
-      return;
-    }
-    try {
-      navigation.navigate("CourseDetail", {
-        course,
-        teacher: currentTeacher,
-      });
-    } catch (error) {
-      console.log("LỖI NAVIGATE:", error);
-      Alert.alert("Lỗi điều hướng", String(error));
-    }
+    if (!currentTeacher) return Alert.alert("Lỗi", "Không tìm thấy giáo viên!");
+    navigation.navigate("CourseDetail", { course, teacher: currentTeacher });
   };
 
   const handleCreateNew = () => {
-    if (!currentTeacher) {
-      Alert.alert("Lỗi", "Không tìm thấy giáo viên!");
-      return;
-    }
+    if (!currentTeacher) return Alert.alert("Lỗi", "Không tìm thấy giáo viên!");
     navigation.navigate("CourseCreate", { teacherid: currentTeacher.id });
   };
 
@@ -399,7 +430,7 @@ const CoursesTab = () => {
     </ScrollView>
   );
 };
-// Tạo profile
+
 const ProfileTab = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<any>();
@@ -411,10 +442,27 @@ const ProfileTab = () => {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (currentTeacher) setForm({ ...currentTeacher });
   }, [currentTeacher]);
+
+  const pickAvatar = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "image/*",
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled) {
+        setUploading(true);
+        setForm((p) => ({ ...p, image: result.assets[0].uri }));
+        setTimeout(() => setUploading(false), 500);
+      }
+    } catch (err) {
+      Alert.alert("Lỗi", "Không thể chọn ảnh");
+    }
+  };
 
   const hasChanges = () => {
     if (!currentTeacher) return false;
@@ -434,7 +482,7 @@ const ProfileTab = () => {
       await dispatch(
         updateTeacherAsync({ ...currentTeacher, ...form } as Teacher)
       ).unwrap();
-      Alert.alert("Thành công", "Cập nhật thông tin thành công!");
+      showNotification("Thành công", "Cập nhật thông tin thành công!");
     } catch (err: any) {
       Alert.alert("Lỗi", err.message || "Cập nhật thất bại");
     }
@@ -442,20 +490,25 @@ const ProfileTab = () => {
 
   const handleChangePassword = async () => {
     if (!currentTeacher) return;
-    if (oldPassword !== currentTeacher.password)
-      return Alert.alert("Lỗi", "Mật khẩu cũ không đúng!");
-    if (newPassword !== confirmPassword)
-      return Alert.alert("Lỗi", "Mật khẩu mới không khớp!");
-    if (newPassword.length < 6)
-      return Alert.alert("Lỗi", "Mật khẩu mới phải ít nhất 6 ký tự!");
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Lỗi", "Mật khẩu mới không khớp!");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert("Lỗi", "Mật khẩu mới phải ít nhất 6 ký tự!");
+      return;
+    }
 
     try {
-      await dispatch(
-        updateTeacherAsync({
-          ...currentTeacher,
-          password: newPassword,
-        } as Teacher)
-      ).unwrap();
+      const updatedTeacher = {
+        ...currentTeacher,
+        password: newPassword,
+      };
+
+      await dispatch(updateTeacherAsync(updatedTeacher)).unwrap();
+
       Alert.alert("Thành công", "Đổi mật khẩu thành công!");
       setShowChangePassword(false);
       setOldPassword("");
@@ -500,6 +553,17 @@ const ProfileTab = () => {
             style={styles.avatar}
             resizeMode="cover"
           />
+          <TouchableOpacity
+            style={styles.avatarEditBtn}
+            onPress={pickAvatar}
+            disabled={uploading}
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="camera" size={18} color="#fff" />
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -509,7 +573,6 @@ const ProfileTab = () => {
         { label: "Địa chỉ", key: "location" },
         { label: "Thời gian làm việc", key: "timework" },
         { label: "Trường", key: "school" },
-        { label: "Link ảnh", key: "image" },
       ].map(({ label, key }) => (
         <View key={key} style={styles.inputGroup}>
           <Text style={styles.inputLabel}>{label}</Text>
@@ -517,7 +580,6 @@ const ProfileTab = () => {
             style={styles.input}
             value={String(form[key as keyof Teacher] ?? "")}
             onChangeText={(t) => setForm((p) => ({ ...p, [key]: t }))}
-            placeholder={key === "image" ? "Nhập URL ảnh..." : ""}
           />
         </View>
       ))}
@@ -616,7 +678,6 @@ const ProfileTab = () => {
     </ScrollView>
   );
 };
-
 const TeacherScreen = () => {
   return (
     <Tab.Navigator
@@ -698,6 +759,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   avatarContainer: {
+    position: "relative",
     marginTop: 12,
     width: 120,
     height: 120,
@@ -708,6 +770,14 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   avatar: { width: "100%", height: "100%" },
+  avatarEditBtn: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "#16a34a",
+    padding: 6,
+    borderRadius: 20,
+  },
 
   inputGroup: { marginBottom: 16 },
   inputLabel: {
@@ -781,6 +851,23 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: "#111827",
   },
+  modalImagePreview: {
+    width: "100%",
+    height: 150,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  uploadButton: {
+    flexDirection: "row",
+    backgroundColor: "#3b82f6",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  uploadButtonText: { color: "#fff", fontWeight: "600", marginLeft: 6 },
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",

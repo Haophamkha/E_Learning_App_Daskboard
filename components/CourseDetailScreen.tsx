@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Modal,
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useDispatch, useSelector } from "react-redux";
@@ -21,8 +22,6 @@ import {
   fetchCoursesAsync,
 } from "../auth/dataSlice";
 import { Course, Teacher, Chapter, Lesson, CATEGORIES } from "../types/type";
-
-
 
 const STATUS_OPTIONS: Array<"completed" | "inprogress" | "not_started"> = [
   "not_started",
@@ -37,15 +36,7 @@ const CourseDetailScreen = () => {
   const loading = useSelector((state: RootState) => state.data.loading);
 
   const { course: initialCourse, teacher } = route.params || {};
-  const [course, setCourse] = useState<Partial<Course>>({
-    name: "",
-    price: 0,
-    discount: 0,
-    category: "",
-    description: "",
-    image: "",
-    project: { description: "", studentproject: [] },
-  });
+  const [course, setCourse] = useState<Partial<Course>>({});
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [deleting, setDeleting] = useState(false);
   const [statusModal, setStatusModal] = useState<{
@@ -53,8 +44,9 @@ const CourseDetailScreen = () => {
     chapterIndex: number;
     lessonIndex: number;
   }>({ visible: false, chapterIndex: -1, lessonIndex: -1 });
+  const [uploadingImage, setUploadingImage] = useState(false);
 
-  // refetch data
+  // Refetch khi quay lại
   useEffect(() => {
     const unsub = navigation.addListener("focus", () => {
       dispatch(fetchCoursesAsync());
@@ -62,7 +54,7 @@ const CourseDetailScreen = () => {
     return unsub;
   }, [navigation, dispatch]);
 
-  // init data
+  // Khởi tạo dữ liệu
   useEffect(() => {
     if (!initialCourse) return;
 
@@ -77,58 +69,51 @@ const CourseDetailScreen = () => {
       project: initialCourse.project ?? { description: "", studentproject: [] },
     });
 
-    // Parse chapters từ string sang JSON 
     let parsed: Chapter[] = [];
     if (typeof initialCourse.chapters === "string") {
       try {
         parsed = JSON.parse(initialCourse.chapters);
       } catch (e) {
-        console.error("Parse chapters error:", e);
         parsed = [];
       }
     } else if (Array.isArray(initialCourse.chapters)) {
       parsed = initialCourse.chapters;
     }
 
-    parsed = parsed.map((ch) => ({
-      ...ch,
-      lessons: (ch.lessons || []).map((les) => ({
-        ...les,
-        status: les.status ?? "not_started",
-      })),
-    }));
-
-    setChapters(parsed);
+    setChapters(
+      parsed.map((ch) => ({
+        ...ch,
+        lessons: (ch.lessons || []).map((les) => ({
+          ...les,
+          status: les.status ?? "not_started",
+        })),
+      }))
+    );
   }, [initialCourse]);
 
-  // === TÍNH TOÁN TỔNG SỐ BÀI HỌC VÀ THỜI LƯỢNG ===
-  const totalLessons = Array.isArray(chapters)
-    ? chapters.reduce(
-        (s, ch) => s + (Array.isArray(ch.lessons) ? ch.lessons.length : 0),
-        0
-      )
-    : 0;
+  // Tính tổng bài học & thời lượng
+  const totalLessons = chapters.reduce(
+    (s, ch) => s + (Array.isArray(ch.lessons) ? ch.lessons.length : 0),
+    0
+  );
 
-  const totalMinutes = Array.isArray(chapters)
-    ? chapters.reduce((s, ch) => {
-        const lessons = Array.isArray(ch.lessons) ? ch.lessons : [];
-        return (
-          s +
-          lessons.reduce((acc, l) => {
-            const m =
-              parseInt((l.duration || "").replace(/[^\d]/g, ""), 10) || 0;
-            return acc + m;
-          }, 0)
-        );
+  const totalMinutes = chapters.reduce((s, ch) => {
+    const lessons = Array.isArray(ch.lessons) ? ch.lessons : [];
+    return (
+      s +
+      lessons.reduce((acc, l) => {
+        const m = parseInt((l.duration || "").replace(/[^\d]/g, ""), 10) || 0;
+        return acc + m;
       }, 0)
-    : 0;
+    );
+  }, 0);
 
   const totalHours = Math.floor(totalMinutes / 60);
   const totalMins = totalMinutes % 60;
   const durationStr =
     totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`;
 
-  // === KIỂM TRA THAY ĐỔI ===
+  // Kiểm tra thay đổi
   const hasChanges = useCallback(() => {
     if (!initialCourse) return false;
 
@@ -153,7 +138,28 @@ const CourseDetailScreen = () => {
     );
   }, [course, initialCourse, chapters, totalLessons, durationStr]);
 
-  // === CẬP NHẬT ===
+  // Upload ảnh
+  const pickImage = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "image/*",
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled) {
+        setUploadingImage(true);
+        const file = result.assets[0];
+        setCourse((prev) => ({ ...prev, image: file.uri }));
+        Alert.alert("Thành công", "Đã chọn ảnh mới!");
+      }
+    } catch (err) {
+      Alert.alert("Lỗi", "Không thể chọn ảnh");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Cập nhật khóa học
   const handleUpdate = async () => {
     if (!hasChanges() || !initialCourse?.id) return;
 
@@ -163,7 +169,7 @@ const CourseDetailScreen = () => {
       id: initialCourse.id,
       lessoncount: totalLessons,
       duration: durationStr,
-      chapters: chapters, 
+      chapters: chapters,
       project: {
         description: course.project?.description || "",
         studentproject: initialCourse.project?.studentproject || [],
@@ -182,31 +188,37 @@ const CourseDetailScreen = () => {
     }
   };
 
- const handleDelete = async () => {
-   if (!initialCourse?.id) {
-     console.log("Không có ID khóa học để xóa");
-     return;
-   }
+  // Xóa khóa học
+  const handleDelete = async () => {
+    if (!initialCourse?.id) return;
 
-   try {
-     setDeleting(true);
-     console.log("Đang xóa khóa học:", initialCourse.id);
+    Alert.alert(
+      "Xác nhận xóa",
+      "Bạn có chắc chắn muốn xóa khóa học này?",
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Xóa",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setDeleting(true);
+              await dispatch(deleteCourseAsync(initialCourse.id)).unwrap();
+              await dispatch(fetchCoursesAsync()).unwrap();
+              Alert.alert("Thành công", "Đã xóa khóa học!");
+              navigation.goBack();
+            } catch (err: any) {
+              Alert.alert("Lỗi", err.message || "Xóa thất bại");
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
-     // Gọi Redux thunk để xóa trong Supabase
-     await dispatch(deleteCourseAsync(initialCourse.id)).unwrap();
-
-     // Sau đó load lại danh sách khóa học
-     await dispatch(fetchCoursesAsync()).unwrap();
-
-     console.log("✅ Xóa khóa học thành công!");
-     navigation.goBack();
-   } catch (err: any) {
-     console.error("❌ Lỗi khi xóa khóa học:", err);
-   } finally {
-     setDeleting(false);
-   }
- };
-
+  // Quản lý chương & bài học
   const addChapter = () => {
     setChapters((prev) => [
       ...prev,
@@ -318,6 +330,7 @@ const CourseDetailScreen = () => {
       <Image source={{ uri: course.image || "" }} style={styles.courseImage} />
 
       <View style={styles.form}>
+        {/* Tên & Giá */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Tên khóa học</Text>
           <TextInput
@@ -352,6 +365,7 @@ const CourseDetailScreen = () => {
           </View>
         </View>
 
+        {/* Danh mục */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Danh mục</Text>
           <View style={styles.pickerContainer}>
@@ -377,6 +391,7 @@ const CourseDetailScreen = () => {
           </View>
         </View>
 
+        {/* Số bài & Thời lượng */}
         <View style={styles.row}>
           <View style={styles.half}>
             <Text style={styles.label}>Số bài học</Text>
@@ -388,6 +403,7 @@ const CourseDetailScreen = () => {
           </View>
         </View>
 
+        {/* Mô tả */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Mô tả khóa học</Text>
           <TextInput
@@ -416,16 +432,46 @@ const CourseDetailScreen = () => {
           />
         </View>
 
+        {/* UPLOAD ẢNH */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Link ảnh</Text>
+          <Text style={styles.label}>Ảnh khóa học</Text>
+
+          {course.image ? (
+            <Image
+              source={{ uri: course.image }}
+              style={styles.imagePreview}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Text style={styles.imagePlaceholderText}>Chưa có ảnh</Text>
+            </View>
+          )}
+
           <TextInput
             style={styles.input}
             value={course.image || ""}
             onChangeText={(t) => setCourse({ ...course, image: t })}
+            placeholder="Hoặc nhập URL..."
           />
+
+          <TouchableOpacity
+            style={[styles.uploadButton, uploadingImage && styles.disabledButton]}
+            onPress={pickImage}
+            disabled={uploadingImage}
+          >
+            {uploadingImage ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="camera-outline" size={18} color="#fff" />
+                <Text style={styles.uploadButtonText}>Chọn ảnh từ máy</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
 
-        {/* === NỘI DUNG KHÓA HỌC === */}
+        {/* NỘI DUNG KHÓA HỌC */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Nội dung khóa học</Text>
@@ -435,86 +481,79 @@ const CourseDetailScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {Array.isArray(chapters) &&
-            chapters.map((chapter, chIdx) => (
-              <View key={chapter.order ?? chIdx} style={styles.chapterBox}>
-                <View style={styles.chapterHeader}>
-                  <TextInput
-                    style={styles.chapterTitleInput}
-                    value={chapter.title}
-                    onChangeText={(t) => updateChapter(chIdx, "title", t)}
-                  />
-                  <TouchableOpacity
-                    style={styles.removeChapterBtn}
-                    onPress={() => removeChapter(chIdx)}
-                  >
-                    <Ionicons name="close-circle" size={22} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-
-                {(chapter.lessons ?? []).map((lesson, lesIdx) => (
-                  <View key={lesson.id ?? lesIdx} style={styles.lessonRow}>
-                    <TextInput
-                      style={styles.lessonTitleInput}
-                      value={lesson.title}
-                      onChangeText={(t) =>
-                        updateLesson(chIdx, lesIdx, "title", t)
-                      }
-                    />
-                    <TextInput
-                      style={styles.durationInput}
-                      value={lesson.duration}
-                      onChangeText={(t) =>
-                        updateLesson(chIdx, lesIdx, "duration", t)
-                      }
-                      placeholder="10m"
-                    />
-                    <TouchableOpacity
-                      style={styles.statusBtn}
-                      onPress={() => openStatusModal(chIdx, lesIdx)}
-                    >
-                      <Text
-                        style={[
-                          styles.statusText,
-                          lesson.status === "completed" &&
-                            styles.statusCompleted,
-                          lesson.status === "inprogress" &&
-                            styles.statusInprogress,
-                          lesson.status === "not_started" &&
-                            styles.statusNotStarted,
-                        ]}
-                      >
-                        {lesson.status === "completed"
-                          ? "Hoàn thành"
-                          : lesson.status === "inprogress"
-                          ? "Đang học"
-                          : "Chưa học"}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.removeBtn}
-                      onPress={() => removeLesson(chIdx, lesIdx)}
-                    >
-                      <Ionicons
-                        name="trash-outline"
-                        size={18}
-                        color="#ef4444"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-
+          {chapters.map((chapter, chIdx) => (
+            <View key={chapter.order ?? chIdx} style={styles.chapterBox}>
+              <View style={styles.chapterHeader}>
+                <TextInput
+                  style={styles.chapterTitleInput}
+                  value={chapter.title}
+                  onChangeText={(t) => updateChapter(chIdx, "title", t)}
+                />
                 <TouchableOpacity
-                  style={styles.addLessonBtn}
-                  onPress={() => addLesson(chIdx)}
+                  style={styles.removeChapterBtn}
+                  onPress={() => removeChapter(chIdx)}
                 >
-                  <Ionicons name="add" size={16} color="#16a34a" />
-                  <Text style={styles.addLessonText}>Thêm bài học</Text>
+                  <Ionicons name="close-circle" size={22} color="#ef4444" />
                 </TouchableOpacity>
               </View>
-            ))}
+
+              {(chapter.lessons ?? []).map((lesson, lesIdx) => (
+                <View key={lesson.id ?? lesIdx} style={styles.lessonRow}>
+                  <TextInput
+                    style={styles.lessonTitleInput}
+                    value={lesson.title}
+                    onChangeText={(t) =>
+                      updateLesson(chIdx, lesIdx, "title", t)
+                    }
+                  />
+                  <TextInput
+                    style={styles.durationInput}
+                    value={lesson.duration}
+                    onChangeText={(t) =>
+                      updateLesson(chIdx, lesIdx, "duration", t)
+                    }
+                    placeholder="10m"
+                  />
+                  <TouchableOpacity
+                    style={styles.statusBtn}
+                    onPress={() => openStatusModal(chIdx, lesIdx)}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        lesson.status === "completed" && styles.statusCompleted,
+                        lesson.status === "inprogress" && styles.statusInprogress,
+                        lesson.status === "not_started" && styles.statusNotStarted,
+                      ]}
+                    >
+                      {lesson.status === "completed"
+                        ? "Hoàn thành"
+                        : lesson.status === "inprogress"
+                        ? "Đang học"
+                        : "Chưa học"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.removeBtn}
+                    onPress={() => removeLesson(chIdx, lesIdx)}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              <TouchableOpacity
+                style={styles.addLessonBtn}
+                onPress={() => addLesson(chIdx)}
+              >
+                <Ionicons name="add" size={16} color="#16a34a" />
+                <Text style={styles.addLessonText}>Thêm bài học</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
         </View>
 
+        {/* NÚT HÀNH ĐỘNG */}
         <View style={styles.actionRow}>
           <TouchableOpacity
             style={[
@@ -548,6 +587,7 @@ const CourseDetailScreen = () => {
         </View>
       </View>
 
+      {/* MODAL TRẠNG THÁI */}
       <Modal visible={statusModal.visible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -618,7 +658,7 @@ const styles = StyleSheet.create({
   readOnly: { backgroundColor: "#f3f4f6", color: "#6b7280" },
   row: { flexDirection: "row", gap: 12, marginBottom: 16 },
   half: { flex: 1 },
-  textArea: { height: 80, textAlignVertical: "top" },
+  textArea: { height: 80, textAlignVertical:"top" },
   pickerContainer: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   pickerItem: {
     paddingHorizontal: 12,
@@ -629,7 +669,38 @@ const styles = StyleSheet.create({
   pickerItemSelected: { backgroundColor: "#16a34a" },
   pickerText: { fontSize: 12, color: "#374151" },
   pickerTextSelected: { color: "#fff", fontWeight: "600" },
-
+  imagePreview: {
+    width: "100%",
+    height: 200,
+    borderRadius: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+  },
+  imagePlaceholder: {
+    width: "100%",
+    height: 200,
+    borderRadius: 12,
+    marginTop: 8,
+    backgroundColor: "#f3f4f6",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+  },
+  imagePlaceholderText: { color: "#6b7280", fontSize: 14 },
+  uploadButton: {
+    flexDirection: "row",
+    backgroundColor: "#3b82f6",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  uploadButtonText: { color: "#fff", fontWeight: "600", marginLeft: 6 },
+  disabledButton: { backgroundColor: "#9ca3af" },
   section: { marginBottom: 24 },
   sectionHeader: {
     flexDirection: "row",
@@ -652,7 +723,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontSize: 13,
   },
-
   chapterBox: {
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -677,7 +747,6 @@ const styles = StyleSheet.create({
     borderBottomColor: "#d1d5db",
   },
   removeChapterBtn: { padding: 4 },
-
   lessonRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -714,7 +783,6 @@ const styles = StyleSheet.create({
   statusInprogress: { color: "#f59e0b" },
   statusNotStarted: { color: "#6b7280" },
   removeBtn: { padding: 4 },
-
   addLessonBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -725,7 +793,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   addLessonText: { color: "#16a34a", fontSize: 13, marginLeft: 4 },
-
   actionRow: { flexDirection: "row", gap: 12, marginTop: 20 },
   updateButton: {
     flex: 1,
@@ -746,10 +813,8 @@ const styles = StyleSheet.create({
     elevation: 2,
     gap: 8,
   },
-  disabledButton: { backgroundColor: "#9ca3af" },
   updateText: { color: "#fff", fontWeight: "600", fontSize: 16 },
   deleteText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

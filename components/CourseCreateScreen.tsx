@@ -10,6 +10,7 @@ import {
   Modal,
   Image,
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useDispatch, useSelector } from "react-redux";
@@ -72,6 +73,28 @@ const CourseCreateScreen = () => {
     chapterIndex: number;
     lessonIndex: number;
   }>({ visible: false, chapterIndex: -1, lessonIndex: -1 });
+
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const pickImage = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "image/*",
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled) {
+        setUploadingImage(true);
+        const file = result.assets[0];
+        setCourse((prev) => ({ ...prev, image: file.uri }));
+        Alert.alert("Thành công", "Đã chọn ảnh khóa học!");
+      }
+    } catch (err) {
+      Alert.alert("Lỗi", "Không thể chọn ảnh");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const totalLessons = Array.isArray(chapters)
     ? chapters.reduce(
@@ -156,23 +179,15 @@ const CourseCreateScreen = () => {
       share: 0,
     };
 
-    // XÓA id HOÀN TOÀN (phòng trường hợp bị nhiễm)
     delete (cleanData as any).id;
     delete (cleanData as any).created_at;
 
-    console.log(
-      "Payload sent to Supabase (NO ID):",
-      JSON.stringify(cleanData, null, 2)
-    );
-
     try {
       const result = await dispatch(addCourseAsync(cleanData)).unwrap();
-      console.log("Course created:", result);
       await dispatch(fetchCoursesAsync()).unwrap();
       Alert.alert("Thành công", "Tạo khóa học thành công!");
       navigation.goBack();
     } catch (err: any) {
-      console.error("Supabase error:", JSON.stringify(err, null, 2));
       Alert.alert("Lỗi", err.message || "Tạo khóa học thất bại");
     }
   };
@@ -381,35 +396,49 @@ const CourseCreateScreen = () => {
           />
         </View>
 
+        {/* UPLOAD ẢNH KHÓA HỌC */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Link ảnh</Text>
+          <Text style={styles.label}>Ảnh khóa học</Text>
+
+          {course.image ? (
+            <Image
+              source={{ uri: course.image }}
+              style={styles.imagePreview}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Text style={styles.imagePlaceholderText}>Chưa có ảnh</Text>
+            </View>
+          )}
+
           <TextInput
             style={styles.input}
             value={course.image}
             onChangeText={(t) => setCourse({ ...course, image: t })}
-            placeholder="Nhập link ảnh"
+            placeholder="Hoặc nhập URL..."
           />
-          {course.image ? (
-            <Image
-              source={{
-                uri:
-                  course.image ||
-                  "https://placehold.co/300x200/cccccc/999999/png",
-              }}
-              style={styles.imagePreview}
-              resizeMode="cover"
-              onError={() => {
-                Alert.alert("Lỗi", "Không thể tải ảnh. Vui lòng kiểm tra URL.");
-                setCourse({ ...course, image: "" });
-              }}
-            />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <Text style={styles.imagePlaceholderText}>Không có ảnh</Text>
-            </View>
-          )}
+
+          <TouchableOpacity
+            style={[
+              styles.uploadButton,
+              uploadingImage && styles.disabledButton,
+            ]}
+            onPress={pickImage}
+            disabled={uploadingImage}
+          >
+            {uploadingImage ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="image-outline" size={18} color="#fff" />
+                <Text style={styles.uploadButtonText}>Chọn ảnh từ máy</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
 
+        {/* NỘI DUNG KHÓA HỌC */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Nội dung khóa học</Text>
@@ -560,7 +589,6 @@ const CourseCreateScreen = () => {
 
 export default CourseCreateScreen;
 
-// Styles giữ nguyên
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9fafb" },
   backButton: {
@@ -619,6 +647,18 @@ const styles = StyleSheet.create({
     borderColor: "#d1d5db",
   },
   imagePlaceholderText: { color: "#6b7280", fontSize: 14 },
+  uploadButton: {
+    flexDirection: "row",
+    backgroundColor: "#3b82f6",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  uploadButtonText: { color: "#fff", fontWeight: "600", marginLeft: 6 },
+  disabledButton: { backgroundColor: "#9ca3af" },
   section: { marginBottom: 24 },
   sectionHeader: {
     flexDirection: "row",
@@ -647,7 +687,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#eecz5e7eb",
+    borderColor: "#e5e7eb",
   },
   chapterHeader: {
     flexDirection: "row",
@@ -720,7 +760,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 2,
   },
-  disabledButton: { backgroundColor: "#9ca3af" },
   updateText: { color: "#fff", fontWeight: "600", fontSize: 16 },
   modalOverlay: {
     flex: 1,
